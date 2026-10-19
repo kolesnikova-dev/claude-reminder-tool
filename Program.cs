@@ -11,17 +11,12 @@ namespace ClaudeReminder
         static async Task Main(string[] args)
         {
             DotNetEnv.Env.Load();
-            string anthropicApiKey = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY") ??
-            throw new Exception("ANTHROPIC_API_KEY environment variable is not set.");
 
-            if (anthropicApiKey != "")
-            {
-                AnthropicClient client = new();
-                Console.WriteLine("Anthropic client initialized successfully.");
-                List<string> stopSequences = new() { };
-                List<MessageParam> messages = new() { };
-                await Chat(client, messages, stopSequences);
-            }
+            AnthropicClient client = new();
+            Console.WriteLine("Anthropic client initialized successfully.");
+            List<string> stopSequences = new() { };
+            List<MessageParam> messages = new() { };
+            await Chat(client, messages, stopSequences);
         }
         internal static async Task Chat(AnthropicClient client, List<MessageParam> messages, List<string> stopSequences)
         {
