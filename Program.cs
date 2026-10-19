@@ -6,67 +6,51 @@ using Anthropic.Models.Messages;
 
 namespace ClaudeReminder
 {
+
+    internal sealed class ChatConfig
+    {
+        public List<MessageParam> Messages { get; init; } = new();
+        public List<string> StopSequences { get; init; } = new();
+        public string System { get; init; } =
+            "You are patient and understanding of a developer trying to build with you. " +
+            "The dev configured a continuous message loop.";
+        public void Deconstruct(out List<MessageParam> messages,
+                      out List<string> stopSequences,
+                      out string system)
+        {
+            messages = Messages;
+            stopSequences = StopSequences;
+            system = System;
+        }
+    }
+
     internal class Program
     {
         static async Task Main(string[] args)
         {
             DotNetEnv.Env.Load();
 
-            AnthropicClient client = new();
-            Console.WriteLine("Anthropic client initialized successfully.");
-            List<string> stopSequences = new() { };
-            List<MessageParam> messages = new() { };
-            await Chat(client, messages, stopSequences);
-        }
-        internal static async Task Chat(AnthropicClient client, List<MessageParam> messages, List<string> stopSequences)
-        {
-            string system = "You are patient and understanding of a developer trying to build with you. " +
-           "The dev configured a continuous message loop.";
-            while (true)
+            AnthropicClient client;
+            try
             {
-                Console.Write("you> ");
-                string? userMessage = Console.ReadLine();
-                if (string.IsNullOrWhiteSpace(userMessage)) break; // Exit on empty input
-                AddUserMessage(messages, userMessage);
-
-                MessageCreateParams parameters = new()
-                {
-                    MaxTokens = 1024,
-                    Messages = messages,
-                    Model = Model.ClaudeHaiku4_5,
-                    System = system,
-                    StopSequences = stopSequences,
-                };
-
-                var message = await client.Messages.Create(parameters);
-
-                var reply = new StringBuilder();
-                foreach (var block in message.Content)
-                {
-                    if (block.TryPickText(out var textBlock))
-                    {
-                        reply.Append(textBlock.Text);
-                    }
-                }
-                Console.WriteLine($"claude> {reply}");
-                AddAssistantMessage(messages, reply.ToString());
+                client = new();
             }
-        }
-        internal static void AddUserMessage(List<MessageParam> messages, string text)
-        {
-            messages.Add(new MessageParam
+            catch (Exception ex)
             {
-                Role = Role.User,
-                Content = text,
-            });
-        }
-        internal static void AddAssistantMessage(List<MessageParam> messages, string text)
-        {
-            messages.Add(new MessageParam
+                Console.WriteLine($"Error initializing Anthropic client: {ex.Message}");
+                return;
+            }
+            Console.WriteLine("Anthropic client initialized successfully.");
+
+            ChatConfig config = new();
+            try
             {
-                Role = Role.Assistant,
-                Content = text,
-            });
+                await ChatService.Chat(client, config);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error during chat: {ex.Message}");
+            }
         }
     }
 }
