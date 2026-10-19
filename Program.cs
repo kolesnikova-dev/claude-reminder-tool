@@ -1,5 +1,6 @@
 ﻿using System;
 using DotNetEnv;
+using System.Text;
 using Anthropic;
 using Anthropic.Models.Messages;
 
@@ -15,41 +16,62 @@ namespace ClaudeReminder
 
             if (anthropicApiKey != "")
             {
-                await InitializeClient(anthropicApiKey);
-                Console.WriteLine("Hello World!");
+                AnthropicClient client = new();
+                Console.WriteLine("Anthropic client initialized successfully.");
+                List<string> stopSequences = new() { };
+                List<MessageParam> messages = new() { };
+                await Chat(client, messages, stopSequences);
             }
         }
-        internal static async Task InitializeClient(string apiKey)
+        internal static async Task Chat(AnthropicClient client, List<MessageParam> messages, List<string> stopSequences)
         {
-            AnthropicClient client = new();
-            Console.WriteLine("Anthropic client initialized successfully.");
             string system = "You are patient and understanding of a developer trying to build with you. " +
-            "The dev configured a continuous message loop.";
-
-            MessageCreateParams parameters = new()
+           "The dev configured a continuous message loop.";
+            while (true)
             {
-                MaxTokens = 1024,
-                Messages =
-                            [
-                                new()
-                                    {
-                                        Role = Role.User,
-                                        Content = Console.ReadLine() ?? throw new Exception("Input is required."),
-                                    },
-                                ],
-                Model = Model.ClaudeHaiku4_5,
-                System = system,
-            };
+                Console.Write("you> ");
+                string? userMessage = Console.ReadLine();
+                if (string.IsNullOrWhiteSpace(userMessage)) break; // Exit on empty input
+                AddUserMessage(messages, userMessage);
 
-            var message = await client.Messages.Create(parameters);
-
-            foreach (var block in message.Content)
-            {
-                if (block.TryPickText(out var textBlock))
+                MessageCreateParams parameters = new()
                 {
-                    Console.WriteLine(textBlock.Text);
+                    MaxTokens = 1024,
+                    Messages = messages,
+                    Model = Model.ClaudeHaiku4_5,
+                    System = system,
+                    StopSequences = stopSequences,
+                };
+
+                var message = await client.Messages.Create(parameters);
+
+                var reply = new StringBuilder();
+                foreach (var block in message.Content)
+                {
+                    if (block.TryPickText(out var textBlock))
+                    {
+                        reply.Append(textBlock.Text);
+                    }
                 }
+                Console.WriteLine($"claude> {reply}");
+                AddAssistantMessage(messages, reply.ToString());
             }
+        }
+        internal static void AddUserMessage(List<MessageParam> messages, string text)
+        {
+            messages.Add(new MessageParam
+            {
+                Role = Role.User,
+                Content = text,
+            });
+        }
+        internal static void AddAssistantMessage(List<MessageParam> messages, string text)
+        {
+            messages.Add(new MessageParam
+            {
+                Role = Role.Assistant,
+                Content = text,
+            });
         }
     }
 }
