@@ -122,15 +122,23 @@ internal static class Tools
             out result);
     }
 
-    private static string GetCurrentDatetime(string dateFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'")
+    internal static string GetCurrentDatetime(string dateFormat = "yyyy-MM-dd'T'HH:mm:ssK")
     {
         if (string.IsNullOrWhiteSpace(dateFormat))
-            throw new ArgumentException("date_format cannot be empty", nameof(dateFormat));
+            throw new ArgumentException("dateFormat cannot be empty", nameof(dateFormat));
 
-        var now = DateTime.UtcNow;                       // always UTC, always unambiguous
-        var culture = ToolCulture;                       // deterministic day/month names, separators
+        // 1. Get the current exact UTC time
+        DateTimeOffset utcNow = DateTimeOffset.UtcNow;
 
-        // If the caller passes a bad format, ToString throws FormatException.
-        return now.ToString(dateFormat, culture);
+        // 2. Safely find the NJ/Eastern Time Zone (Works on both Windows and Linux/.NET Core)
+        TimeZoneInfo njTimeZone = TimeZoneInfo.FindSystemTimeZoneById(
+            OperatingSystem.IsWindows() ? "Eastern Standard Time" : "America/New_York"
+        );
+
+        // 3. Convert UTC to local NJ time (automatically handles Daylight Saving Time)
+        DateTimeOffset njTime = TimeZoneInfo.ConvertTime(utcNow, njTimeZone);
+
+        // 4. Return formatted string with InvariantCulture
+        return njTime.ToString(dateFormat, CultureInfo.InvariantCulture);
     }
 }
