@@ -23,6 +23,7 @@ internal class ChatService
                 Model = Model.ClaudeHaiku4_5,
                 System = system,
                 StopSequences = stopSequences,
+                Tools = ToolSchemas.All
             };
 
             var message = await client.Messages.Create(parameters);
