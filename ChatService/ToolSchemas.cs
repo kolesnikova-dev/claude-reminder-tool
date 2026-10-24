@@ -71,12 +71,15 @@ internal static class ToolSchemas
     },
       new Tool
         {
-            Name = "get_current_time",
+            Name = "get_current_datetime",
             Description = "Returns the current time in ISO 8601 format (YYYY-MM-DDTHH:MM:SS) in UTC. Use when the user asks for the current time or when a tool needs to know the current time.",
             InputSchema = new InputSchema
             {
-                Properties = new Dictionary<string, JsonElement>(),
-                Required = Array.Empty<string>()
+                Properties = new Dictionary<string, JsonElement>{
+                    ["date_format"] = JsonSerializer.SerializeToElement(
+                        new { type = "string", description = "The date format. Accepted shapes: 'YYYY-MM-DD' (e.g. '2025-04-03'), 'YYYY-MM-DDTHH:MM:SS' (e.g. '2025-04-03T10:30:00'), or 'YYYY-MM-DD HH:MM:SS'. If no timezone is given, UTC is assumed." }),
+                },
+                Required = ["date_format"]
             }
         }
 };
