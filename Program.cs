@@ -43,32 +43,10 @@ namespace ClaudeReminder
             }
             Console.WriteLine("Anthropic client initialized successfully.");
 
-            ChatConfig config = new ChatConfig
-            {
-                Messages = { new MessageParam { Role = Role.User, Content = "What is the exact time, formatted as HH:MM:SS?" } }
-            };
+            ChatConfig config = new();
             try
             {
-                // await ChatService.Chat(client, config);
-                var response = await client.Messages.Create(new MessageCreateParams
-                {
-                    MaxTokens = 1024,
-                    Messages = config.Messages,
-                    Model = Model.ClaudeHaiku4_5,
-                    System = config.System,
-                    StopSequences = config.StopSequences,
-                    Tools = ToolSchemas.All
-                });
-                // var reply = new StringBuilder();
-                // foreach (var block in response.Content)
-                // {
-                //     if (block.TryPickText(out var textBlock))
-                //     {
-                //         reply.Append(textBlock.Text);
-                //     }
-                // }
-                // Console.WriteLine($"claude> {reply}");
-                Console.WriteLine(JsonSerializer.Serialize(response, new JsonSerializerOptions { WriteIndented = true }));
+                await ChatService.Chat(client, config);
             }
             catch (Exception ex)
             {
