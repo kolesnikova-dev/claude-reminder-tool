@@ -21,6 +21,8 @@ internal static class ChatService
 
             while (true) // inner loop
             {
+                // The SDK serializes the typed request (messages, tools, system) to JSON
+                // and deserializes the response, so no manual JSON handling is needed here.
                 var response = await client.Messages.Create(BuildParameters(config, messages));
 
                 if (response.StopReason == StopReason.ToolUse)
@@ -70,6 +72,9 @@ internal static class ChatService
         foreach (var tu in toolUses)
         {
             var (content, isError) = ExecuteTool(tu.Name, tu.Input);
+            // content is already a string, which is what tool_result expects, and the SDK
+            // serializes this block to JSON. (A tool returning an object would need
+            // JsonSerializer.Serialize first, the equivalent of Python's json.dumps.)
             resultBlocks.Add(new ToolResultBlockParam
             {
                 ToolUseID = tu.ID,
@@ -81,6 +86,8 @@ internal static class ChatService
         AddUserMessage(messages, resultBlocks);
     }
 
+    // input arrives already deserialized by the SDK (no json.loads equivalent needed);
+    // the GetString/GetDouble helpers just read typed values out of it.
     private static (string content, bool isError) ExecuteTool(
         string toolName, IReadOnlyDictionary<string, JsonElement> input)
     {
