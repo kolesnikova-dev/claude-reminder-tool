@@ -12,9 +12,7 @@ namespace ClaudeReminder
     {
         public List<MessageParam> Messages { get; init; } = new();
         public List<string> StopSequences { get; init; } = new();
-        public string System { get; init; } =
-            "You are patient and understanding of a developer trying to build with you. " +
-            "The dev configured a continuous message loop.";
+        public string System { get; init; } = "";
         public void Deconstruct(out List<MessageParam> messages,
                       out List<string> stopSequences,
                       out string system)
@@ -43,7 +41,11 @@ namespace ClaudeReminder
             }
             Console.WriteLine("Anthropic client initialized successfully.");
 
-            ChatConfig config = new();
+            ChatConfig config = new()
+            {
+                System = "You are patient and understanding of a developer trying to build with you. " +
+            "The dev configured a continuous message loop."
+            };
             try
             {
                 await ChatService.Chat(client, config);

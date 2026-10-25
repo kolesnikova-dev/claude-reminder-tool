@@ -154,9 +154,9 @@ internal class ChatService
     private static double GetDouble(IReadOnlyDictionary<string, JsonElement> input, string key, double fallback = 0) =>
         input.TryGetValue(key, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetDouble() : fallback;
 
-    internal static void AddUserMessage(List<MessageParam> messages, string text) =>
-        messages.Add(new MessageParam { Role = Role.User, Content = text });
+    internal static void AddUserMessage(List<MessageParam> messages, MessageParamContent message) =>
+        messages.Add(new MessageParam { Role = Role.User, Content = message });
 
-    internal static void AddAssistantMessage(List<MessageParam> messages, string text) =>
-        messages.Add(new MessageParam { Role = Role.Assistant, Content = text });
+    internal static void AddAssistantMessage(List<MessageParam> messages, MessageParamContent message) =>
+        messages.Add(new MessageParam { Role = Role.Assistant, Content = message });
 }
