@@ -41,3 +41,23 @@ Claude now knows the answer, emits second tool_use: set_reminder(content, timest
   ▼
 Claude emits final text: "I've set a reminder for April 6."
 ```
+
+## Add a new tool
+
+A tool lives in four places. Each step below must use the same tool name and the same argument keys, or Claude's call will fall through to `Unknown tool`.
+
+1. **Name it** in `ToolNames` (`ChatService/Tools.cs`). Add a `const string` in `snake_case`, e.g. `public const string DeleteReminder = "delete_reminder";`. It must be a `const` because it is used as a `case` label.
+2. **Implement it** in the `Tools` class (`ChatService/Tools.cs`) as a `static` method. Return a `string` (or a result type you convert to a string). Throwing is fine: `ExecuteTool` catches exceptions and reports them to Claude as an error result.
+3. **Describe it** by adding a `new Tool { ... }` to `ToolSchemas.All` (`ChatService/ToolSchemas.cs`):
+   - `Name = ToolNames.YourTool`
+   - `Description`: what it does and when Claude should use it. This is what Claude reads to decide whether to call it.
+   - `InputSchema.Properties`: one entry per argument, with a `type` and a `description`.
+   - `Required`: only the arguments Claude must always send (an empty list is fine).
+4. **Dispatch it** by adding a `case ToolNames.YourTool:` to `ExecuteTool` (`ChatService/ChatService.cs`). Read the arguments with `GetString` / `GetDouble` using the exact property names from step 3, call your `Tools` method, and return `(content, isError)`.
+5. **Try it**: run the app and ask for something that should trigger the tool. Check that Claude calls it, that the arguments arrive as expected, and that the final answer uses the result.
+
+Things worth knowing:
+- Serialization is handled by the SDK. Tool input arrives already parsed, and the `content` string you return is wrapped in a `tool_result` block for you. Only call `JsonSerializer.Serialize` if you want to return structured data as a string.
+- Missing optional arguments come back as `null` (strings) or the fallback (numbers), so give them defaults in the `Tools` method.
+- Return plain, readable text. Claude uses it to write the final reply.
+- If Claude never calls the tool, improve the `Description` first.
