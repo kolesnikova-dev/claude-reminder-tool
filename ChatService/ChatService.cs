@@ -19,61 +19,66 @@ internal static class ChatService
 
             AddUserMessage(messages, userMessage);
 
-            // Inner loop: keep talking to Claude until it stops asking for tools.
-            while (true)
+            while (true) // inner loop
             {
-                var parameters = BuildParameters(config, messages);
+                var response = await client.Messages.Create(BuildParameters(config, messages));
 
-                var message = await client.Messages.Create(parameters);
-
-                // Collect any tool_use blocks in this response.
-                var toolUses = new List<ToolUseBlock>();
-                foreach (var block in message.Content)
-                    if (block.TryPickToolUse(out var tu))
-                        toolUses.Add(tu);
-
-                if (toolUses.Count == 0)
+                if (response.StopReason == StopReason.ToolUse)
                 {
-                    // No tools requested — print the text and wait for the next user turn.
-                    var reply = TextFromMessage(message);
-                    Console.WriteLine($"claude> {reply}");
-                    AddAssistantMessage(messages, reply);
-                    break; // back to outer loop: read next user input
+                    HandleToolUse(messages, response);
+                    continue; // adds assistant turn + tool_result turn
+                }
+                if (response.StopReason == StopReason.MaxTokens)
+                {
+                    Console.WriteLine($"claude> Oops! Out of tokens.");
+                    break;
                 }
 
-                // 1. Echo Claude's assistant turn, including every tool_use block.
-                var assistantBlocks = new List<ContentBlockParam>();
-                foreach (var block in message.Content)
-                {
-                    if (block.TryPickText(out var tb))
-                        assistantBlocks.Add(new TextBlockParam { Text = tb.Text });
-                    else if (block.TryPickToolUse(out var tu))
-                        assistantBlocks.Add(new ToolUseBlockParam
-                        {
-                            ID = tu.ID,
-                            Name = tu.Name,
-                            Input = tu.Input,
-                        });
-                }
-                AddAssistantMessage(messages, assistantBlocks);
-
-                // 2. Execute each tool, collect results.
-                var resultBlocks = new List<ContentBlockParam>();
-                foreach (var tu in toolUses)
-                {
-                    var (content, isError) = ExecuteTool(tu.Name, tu.Input);
-                    resultBlocks.Add(new ToolResultBlockParam
-                    {
-                        ToolUseID = tu.ID,
-                        Content = content,
-                        IsError = isError,
-                    });
-                }
-
-                // 3. Add the tool results as a user turn, then loop to ask Claude again.
-                AddUserMessage(messages, resultBlocks);
+                var assistantMessage = TextFromMessage(response);
+                Console.WriteLine($"claude> {assistantMessage}");
+                AddAssistantMessage(messages, assistantMessage);
+                break; // back to asking the user
             }
         }
+    }
+
+    private static void HandleToolUse(List<MessageParam> messages, Message response)
+    {
+        // Collect any tool_use blocks in this response.
+        var toolUses = new List<ToolUseBlock>();
+        foreach (var block in response.Content)
+            if (block.TryPickToolUse(out var tu))
+                toolUses.Add(tu);
+        // 1. Echo Claude's assistant turn, including every tool_use block.
+        var assistantBlocks = new List<ContentBlockParam>();
+        foreach (var block in response.Content)
+        {
+            if (block.TryPickText(out var tb))
+                assistantBlocks.Add(new TextBlockParam { Text = tb.Text });
+            else if (block.TryPickToolUse(out var tu))
+                assistantBlocks.Add(new ToolUseBlockParam
+                {
+                    ID = tu.ID,
+                    Name = tu.Name,
+                    Input = tu.Input,
+                });
+        }
+        AddAssistantMessage(messages, assistantBlocks);
+
+        // 2. Execute each tool, collect results.
+        var resultBlocks = new List<ContentBlockParam>();
+        foreach (var tu in toolUses)
+        {
+            var (content, isError) = ExecuteTool(tu.Name, tu.Input);
+            resultBlocks.Add(new ToolResultBlockParam
+            {
+                ToolUseID = tu.ID,
+                Content = content,
+                IsError = isError,
+            });
+        }
+        // 3. Add the tool results as a user turn, then loop to ask Claude again.
+        AddUserMessage(messages, resultBlocks);
     }
 
     private static (string content, bool isError) ExecuteTool(
