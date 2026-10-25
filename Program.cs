@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Text.Json;
 using DotNetEnv;
-using System.Text;
 using Anthropic;
 using Anthropic.Models.Messages;
 
@@ -10,17 +8,10 @@ namespace ClaudeReminder
 
     internal sealed class ChatConfig
     {
-        public List<MessageParam> Messages { get; init; } = new();
         public List<string> StopSequences { get; init; } = new();
         public string System { get; init; } = "";
-        public void Deconstruct(out List<MessageParam> messages,
-                      out List<string> stopSequences,
-                      out string system)
-        {
-            messages = Messages;
-            stopSequences = StopSequences;
-            system = System;
-        }
+        public int MaxTokens { get; init; } = 1024;
+        public Model Model { get; init; } = Model.ClaudeHaiku4_5;
     }
 
     internal class Program

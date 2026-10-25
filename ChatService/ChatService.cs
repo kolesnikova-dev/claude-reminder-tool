@@ -1,41 +1,16 @@
-using System.Globalization;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Anthropic;
 using Anthropic.Models.Messages;
 
 namespace ClaudeReminder;
 
-internal sealed record ToolResult
-{
-    public const string BlockType = "tool_result";
-
-    [JsonPropertyName("type")]
-    public string Type => BlockType;
-
-    [JsonPropertyName("tool_use_id")]
-    public required string ToolUseId { get; init; }
-
-    [JsonPropertyName("content")]
-    public string? Content { get; init; }
-
-    [JsonPropertyName("is_error")]
-    public bool IsError { get; init; }
-
-    public static ToolResult Success(string toolUseId, string content) =>
-        new() { ToolUseId = toolUseId, Content = content };
-
-    public static ToolResult Failure(string toolUseId, string error) =>
-        new() { ToolUseId = toolUseId, Content = error, IsError = true };
-}
-
-internal class ChatService
+internal static class ChatService
 {
     internal static async Task Chat(AnthropicClient client, ChatConfig config)
     {
-        var (messages, stopSequences, system) = config;
 
+        List<MessageParam> messages = new();
         while (true)
         {
             Console.Write("you> ");
@@ -47,15 +22,7 @@ internal class ChatService
             // Inner loop: keep talking to Claude until it stops asking for tools.
             while (true)
             {
-                var parameters = new MessageCreateParams
-                {
-                    MaxTokens = 1024,
-                    Messages = messages,
-                    Model = Model.ClaudeHaiku4_5,
-                    System = system,
-                    StopSequences = stopSequences,
-                    Tools = ToolSchemas.All,
-                };
+                var parameters = BuildParameters(config, messages);
 
                 var message = await client.Messages.Create(parameters);
 
@@ -88,7 +55,7 @@ internal class ChatService
                             Input = tu.Input,
                         });
                 }
-                messages.Add(new MessageParam { Role = Role.Assistant, Content = assistantBlocks });
+                AddAssistantMessage(messages, assistantBlocks);
 
                 // 2. Execute each tool, collect results.
                 var resultBlocks = new List<ContentBlockParam>();
@@ -104,7 +71,7 @@ internal class ChatService
                 }
 
                 // 3. Add the tool results as a user turn, then loop to ask Claude again.
-                messages.Add(new MessageParam { Role = Role.User, Content = resultBlocks });
+                AddUserMessage(messages, resultBlocks);
             }
         }
     }
@@ -132,8 +99,7 @@ internal class ChatService
                         : (result.Error!, true);
 
                 case ToolNames.GetCurrentDatetime:
-                    return (Tools.GetCurrentDatetime(
-                        GetString(input, "date_format") ?? Tools.OutputFormat), false);
+                    return (Tools.GetCurrentDatetime(GetString(input, "date_format")), false);
 
                 default:
                     return ($"Error: Unknown tool '{toolName}'.", true);
@@ -152,7 +118,7 @@ internal class ChatService
         input.TryGetValue(key, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetDouble() : fallback;
 
     internal static void AddUserMessage(List<MessageParam> messages, MessageParamContent message) =>
-        messages.Add(new MessageParam { Role = Role.User, Content = message });
+       messages.Add(new MessageParam { Role = Role.User, Content = message });
 
     internal static void AddAssistantMessage(List<MessageParam> messages, MessageParamContent message) =>
         messages.Add(new MessageParam { Role = Role.Assistant, Content = message });
@@ -165,5 +131,18 @@ internal class ChatService
                 reply.Append(tb.Text);
 
         return reply.ToString();
+    }
+
+    private static MessageCreateParams BuildParameters(ChatConfig config, List<MessageParam> messages)
+    {
+        return new MessageCreateParams
+        {
+            MaxTokens = config.MaxTokens,
+            Messages = messages,
+            Model = config.Model,
+            System = config.System,
+            StopSequences = config.StopSequences,
+            Tools = ToolSchemas.All,
+        };
     }
 }

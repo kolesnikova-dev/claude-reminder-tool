@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Text.Json.Serialization;
 
 namespace ClaudeReminder;
 
@@ -10,6 +11,28 @@ internal static class ToolNames
     public const string GetCurrentDatetime = "get_current_datetime";
 }
 
+internal sealed record ToolResult
+{
+    public const string BlockType = "tool_result";
+
+    [JsonPropertyName("type")]
+    public string Type => BlockType;
+
+    [JsonPropertyName("tool_use_id")]
+    public required string ToolUseId { get; init; }
+
+    [JsonPropertyName("content")]
+    public string? Content { get; init; }
+
+    [JsonPropertyName("is_error")]
+    public bool IsError { get; init; }
+
+    public static ToolResult Success(string toolUseId, string content) =>
+        new() { ToolUseId = toolUseId, Content = content };
+
+    public static ToolResult Failure(string toolUseId, string error) =>
+        new() { ToolUseId = toolUseId, Content = error, IsError = true };
+}
 
 internal readonly record struct DurationResult(bool Success, DateTime? NewDatetime, string? Error)
 {
@@ -129,7 +152,7 @@ internal static class Tools
             out result);
     }
 
-    internal static string GetCurrentDatetime(string? dateFormat = OutputFormat)
+    internal static string GetCurrentDatetime(string? dateFormat = null)
     {
         DateTimeOffset now = DateTimeOffset.Now;          // local time with offset
         var tz = TimeZoneInfo.Local;
