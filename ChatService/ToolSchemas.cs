@@ -77,7 +77,7 @@ internal static class ToolSchemas
             {
                 Properties = new Dictionary<string, JsonElement>{
                     ["date_format"] = JsonSerializer.SerializeToElement(
-                        new { type = "string", description = "The date format. Accepted shapes: 'YYYY-MM-DD' (e.g. '2025-04-03'), 'YYYY-MM-DDTHH:MM:SS' (e.g. '2025-04-03T10:30:00'), or 'YYYY-MM-DD HH:MM:SS'. If no timezone is given, UTC is assumed." }),
+                        new { type = "string", description = ".NET custom date format string, e.g. 'yyyy-MM-dd' or 'yyyy-MM-dd HH:mm:ss'. Case-sensitive: yyyy year, MM month, dd day, HH 24-hour hour, mm minute, ss second." }),
                 },
                 Required = new List<string>()
             }
