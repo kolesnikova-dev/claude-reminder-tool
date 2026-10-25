@@ -68,12 +68,9 @@ internal class ChatService
                 if (toolUses.Count == 0)
                 {
                     // No tools requested — print the text and wait for the next user turn.
-                    var reply = new StringBuilder();
-                    foreach (var block in message.Content)
-                        if (block.TryPickText(out var tb))
-                            reply.Append(tb.Text);
+                    var reply = TextFromMessage(message);
                     Console.WriteLine($"claude> {reply}");
-                    AddAssistantMessage(messages, reply.ToString());
+                    AddAssistantMessage(messages, reply);
                     break; // back to outer loop: read next user input
                 }
 
@@ -119,13 +116,13 @@ internal class ChatService
         {
             switch (toolName)
             {
-                case "set_reminder":
+                case ToolNames.SetReminder:
                     Tools.SetReminder(
                         GetString(input, "content") ?? "",
                         GetString(input, "timestamp") ?? "");
                     return ("Reminder set.", false);
 
-                case "add_duration_to_datetime":
+                case ToolNames.AddDurationToDatetime:
                     var result = Tools.AddDurationToDatetime(
                         GetString(input, "datetime_str"),
                         GetDouble(input, "duration"),
@@ -134,9 +131,9 @@ internal class ChatService
                         ? (Tools.FormatForDisplay(result), false)
                         : (result.Error!, true);
 
-                case "get_current_datetime":
+                case ToolNames.GetCurrentDatetime:
                     return (Tools.GetCurrentDatetime(
-                        GetString(input, "date_format") ?? "yyyy-MM-dd'T'HH:mm:ssK"), false);
+                        GetString(input, "date_format") ?? Tools.OutputFormat), false);
 
                 default:
                     return ($"Error: Unknown tool '{toolName}'.", true);
@@ -159,4 +156,14 @@ internal class ChatService
 
     internal static void AddAssistantMessage(List<MessageParam> messages, MessageParamContent message) =>
         messages.Add(new MessageParam { Role = Role.Assistant, Content = message });
+
+    internal static string TextFromMessage(Message message)
+    {
+        var reply = new StringBuilder();
+        foreach (var block in message.Content)
+            if (block.TryPickText(out var tb))
+                reply.Append(tb.Text);
+
+        return reply.ToString();
+    }
 }

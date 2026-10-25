@@ -3,6 +3,14 @@ using System.Globalization;
 
 namespace ClaudeReminder;
 
+internal static class ToolNames
+{
+    public const string SetReminder = "set_reminder";
+    public const string AddDurationToDatetime = "add_duration_to_datetime";
+    public const string GetCurrentDatetime = "get_current_datetime";
+}
+
+
 internal readonly record struct DurationResult(bool Success, DateTime? NewDatetime, string? Error)
 {
     public static DurationResult Ok(DateTime dt) => new(true, dt, null);
@@ -15,8 +23,7 @@ internal static class Tools
 {
     // The one output format the tool promises. Culture-explicit so day/month
     // names are English regardless of host locale (matches Python's C locale).
-    private const string OutputFormat = "dddd, MMMM dd, yyyy hh:mm:ss tt";
-
+    internal const string OutputFormat = "dddd, MMMM dd, yyyy hh:mm:ss tt";
     private static readonly CultureInfo ToolCulture = CultureInfo.InvariantCulture;
 
     // ---------- set_reminder ----------
@@ -122,23 +129,17 @@ internal static class Tools
             out result);
     }
 
-    internal static string GetCurrentDatetime(string dateFormat = "yyyy-MM-dd'T'HH:mm:ssK")
+    internal static string GetCurrentDatetime(string? dateFormat = OutputFormat)
     {
+        DateTimeOffset now = DateTimeOffset.Now;          // local time with offset
+        var tz = TimeZoneInfo.Local;
+
         if (string.IsNullOrWhiteSpace(dateFormat))
-            throw new ArgumentException("dateFormat cannot be empty", nameof(dateFormat));
+        {
+            string zoneName = tz.IsDaylightSavingTime(now) ? tz.DaylightName : tz.StandardName;
+            return $"{now.ToString(OutputFormat, CultureInfo.InvariantCulture)}, {zoneName}";
+        }
 
-        // 1. Get the current exact UTC time
-        DateTimeOffset utcNow = DateTimeOffset.UtcNow;
-
-        // 2. Safely find the NJ/Eastern Time Zone (Works on both Windows and Linux/.NET Core)
-        TimeZoneInfo njTimeZone = TimeZoneInfo.FindSystemTimeZoneById(
-            OperatingSystem.IsWindows() ? "Eastern Standard Time" : "America/New_York"
-        );
-
-        // 3. Convert UTC to local NJ time (automatically handles Daylight Saving Time)
-        DateTimeOffset njTime = TimeZoneInfo.ConvertTime(utcNow, njTimeZone);
-
-        // 4. Return formatted string with InvariantCulture
-        return njTime.ToString(dateFormat, CultureInfo.InvariantCulture);
+        return now.ToString(dateFormat, CultureInfo.InvariantCulture);
     }
 }
