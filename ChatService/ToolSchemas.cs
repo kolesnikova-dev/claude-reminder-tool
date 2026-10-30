@@ -68,8 +68,8 @@ internal static class ToolSchemas
                 },
                 Required = ["invocations"]
             }
-    },
-      new Tool
+        },
+        new Tool
         {
             Name = "get_current_datetime",
             Description = "Returns the current time in user requested format, if user does not specify format, a default format is used(yyyy-MM-dd'T'HH:mm:ssK). Use when the user asks for the current time or when a tool needs to know the current time.",
@@ -81,6 +81,8 @@ internal static class ToolSchemas
                 },
                 Required = new List<string>()
             }
-        }
-};
+        },
+        // Anthropic's built-in text editor: the schema is defined server-side, we only declare it.
+        new ToolTextEditor20250728()
+    };
 }

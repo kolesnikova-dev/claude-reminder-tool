@@ -9,6 +9,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- The project sits at the repo root, so without this the test sources would compile into the app. -->
+    <Compile Remove="ClaudeReminder.Tests/**" />
+    <InternalsVisibleTo Include="ClaudeReminder.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Anthropic" Version="12.58.0" />
     <PackageReference Include="DotNetEnv" Version="3.2.0" />
   </ItemGroup>

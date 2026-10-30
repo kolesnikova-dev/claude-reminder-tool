@@ -11,11 +11,18 @@ internal static class ChatService
     {
 
         List<MessageParam> messages = new();
+        var editor = new TextEditorTool(confirmWrite: ConfirmWrite);
         while (true)
         {
             Console.Write("you> ");
             string? userMessage = Console.ReadLine();
             if (string.IsNullOrWhiteSpace(userMessage)) break;
+
+            if (userMessage.StartsWith('/'))
+            {
+                HandleSlashCommand(editor, userMessage);
+                continue; // local commands are never sent to Claude
+            }
 
             AddUserMessage(messages, userMessage);
 
@@ -27,7 +34,7 @@ internal static class ChatService
 
                 if (response.StopReason == StopReason.ToolUse)
                 {
-                    HandleToolUse(messages, response);
+                    HandleToolUse(messages, response, editor);
                     continue; // adds assistant turn + tool_result turn
                 }
                 if (response.StopReason == StopReason.MaxTokens)
@@ -44,7 +51,41 @@ internal static class ChatService
         }
     }
 
-    private static void HandleToolUse(List<MessageParam> messages, Message response)
+    private static bool ConfirmWrite(string summary)
+    {
+        Console.WriteLine($"----\n{summary}\n----");
+        Console.Write("Apply this edit? [y/N] ");
+        string? answer = Console.ReadLine()?.Trim();
+        return answer is not null
+            && (answer.Equals("y", StringComparison.OrdinalIgnoreCase)
+                || answer.Equals("yes", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static void HandleSlashCommand(TextEditorTool editor, string line)
+    {
+        string[] parts = line.Split(' ', 2, StringSplitOptions.TrimEntries);
+        try
+        {
+            switch (parts[0])
+            {
+                case "/undo" when parts.Length == 2 && parts[1].Length > 0:
+                    Console.WriteLine(editor.UndoEdit(parts[1]));
+                    break;
+                case "/clean-backups":
+                    Console.WriteLine($"Deleted {editor.ClearBackups()} backup file(s).");
+                    break;
+                default:
+                    Console.WriteLine("Commands: /undo <path>, /clean-backups");
+                    break;
+            }
+        }
+        catch (Exception ex) when (ex is TextEditorException or IOException or UnauthorizedAccessException)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+    }
+
+    private static void HandleToolUse(List<MessageParam> messages, Message response, TextEditorTool editor)
     {
         // Collect any tool_use blocks in this response.
         var toolUses = new List<ToolUseBlock>();
@@ -71,7 +112,7 @@ internal static class ChatService
         var resultBlocks = new List<ContentBlockParam>();
         foreach (var tu in toolUses)
         {
-            var (content, isError) = ExecuteTool(tu.Name, tu.Input);
+            var (content, isError) = ExecuteTool(tu.Name, tu.Input, editor);
             // content is already a string, which is what tool_result expects, and the SDK
             // serializes this block to JSON. (A tool returning an object would need
             // JsonSerializer.Serialize first, the equivalent of Python's json.dumps.)
@@ -89,12 +130,15 @@ internal static class ChatService
     // input arrives already deserialized by the SDK (no json.loads equivalent needed);
     // the GetString/GetDouble helpers just read typed values out of it.
     private static (string content, bool isError) ExecuteTool(
-        string toolName, IReadOnlyDictionary<string, JsonElement> input)
+        string toolName, IReadOnlyDictionary<string, JsonElement> input, TextEditorTool editor)
     {
         try
         {
             switch (toolName)
             {
+                case ToolNames.TextEditor:
+                    return TextEditorToolRunner.Execute(editor, input);
+
                 case ToolNames.SetReminder:
                     Tools.SetReminder(
                         GetString(input, "content") ?? "",
@@ -123,11 +167,36 @@ internal static class ChatService
         }
     }
 
-    private static string? GetString(IReadOnlyDictionary<string, JsonElement> input, string key) =>
+    internal static string? GetString(IReadOnlyDictionary<string, JsonElement> input, string key) =>
         input.TryGetValue(key, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
 
-    private static double GetDouble(IReadOnlyDictionary<string, JsonElement> input, string key, double fallback = 0) =>
+    internal static double GetDouble(IReadOnlyDictionary<string, JsonElement> input, string key, double fallback = 0) =>
         input.TryGetValue(key, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetDouble() : fallback;
+
+    // Accepts 3 and 3.0 (models occasionally send whole numbers as floats); null for anything else.
+    internal static int? GetInt(IReadOnlyDictionary<string, JsonElement> input, string key)
+    {
+        if (!input.TryGetValue(key, out var v) || v.ValueKind != JsonValueKind.Number)
+            return null;
+        if (v.TryGetInt32(out int whole))
+            return whole;
+        return v.TryGetDouble(out double d) && d == Math.Truncate(d) && Math.Abs(d) <= int.MaxValue ? (int)d : null;
+    }
+
+    internal static int[]? GetIntArray(IReadOnlyDictionary<string, JsonElement> input, string key)
+    {
+        if (!input.TryGetValue(key, out var v) || v.ValueKind != JsonValueKind.Array)
+            return null;
+
+        var result = new List<int>();
+        foreach (var item in v.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.Number || !item.TryGetInt32(out int n))
+                return null;
+            result.Add(n);
+        }
+        return result.ToArray();
+    }
 
     internal static void AddUserMessage(List<MessageParam> messages, MessageParamContent message) =>
        messages.Add(new MessageParam { Role = Role.User, Content = message });
