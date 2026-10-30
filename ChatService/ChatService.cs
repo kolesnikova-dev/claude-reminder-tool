@@ -36,7 +36,15 @@ internal static class ChatService
                     break;
                 }
 
-                var assistantMessage = TextFromMessage(response);
+                string assistantMessage;
+                if (config.IsChatStream == true)
+                {
+                    assistantMessage = ChatStream(response);
+                }
+                else
+                {
+                    assistantMessage = TextFromMessage(response);
+                }
                 Console.WriteLine($"claude> {assistantMessage}");
                 AddAssistantMessage(messages, assistantMessage);
                 break; // back to asking the user
@@ -136,6 +144,16 @@ internal static class ChatService
         messages.Add(new MessageParam { Role = Role.Assistant, Content = message });
 
     internal static string TextFromMessage(Message message)
+    {
+        var reply = new StringBuilder();
+        foreach (var block in message.Content)
+            if (block.TryPickText(out var tb))
+                reply.Append(tb.Text);
+
+        return reply.ToString();
+    }
+
+    internal static string ChatStream(Message message)
     {
         var reply = new StringBuilder();
         foreach (var block in message.Content)
