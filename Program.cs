@@ -12,8 +12,6 @@ namespace ClaudeReminder
         public string System { get; init; } = "";
         public int MaxTokens { get; init; } = 1024;
         public Model Model { get; init; } = Model.ClaudeHaiku4_5;
-
-        public bool IsChatStream { get; init; }
     }
 
     internal class Program
@@ -37,8 +35,7 @@ namespace ClaudeReminder
             ChatConfig config = new()
             {
                 System = "You are patient and understanding of a developer trying to build with you. " +
-            "The dev configured a continuous message loop.",
-                IsChatStream = false
+            "The dev configured a continuous message loop."
             };
             try
             {
